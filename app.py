@@ -6,6 +6,7 @@ import os
 import hashlib
 from datetime import datetime
 from functools import wraps
+import openai  # Import OpenAI library
 
 app = Flask(__name__)
 
@@ -21,6 +22,9 @@ mysql = MySQL(app)
 
 # Google OAuth2 Configuration
 CLIENT_ID = "1058099786136-rduhgd2e6rnln5op6romet21vcshjrb3.apps.googleusercontent.com"
+
+# OpenAI API Key
+openai.api_key = 'AIzaSyDKRimFNnEy0tXt1T6kY_9B9BNqFshszKs'  # Replace with your OpenAI API key
 
 # Helper Functions
 def hash_password(password):
@@ -57,6 +61,23 @@ def init_db():
 with app.app_context():
     init_db()
 
+# OpenAI Chatbot Function
+def ask_openai(prompt):
+    """Send a prompt to OpenAI and get a response"""
+    try:
+        response = openai.Completion.create(
+            engine="text-davinci-003",  # Use "gpt-3.5-turbo" for newer models
+            prompt=prompt,
+            max_tokens=150,  # Adjust based on the length of responses you want
+            n=1,  # Number of responses to generate
+            stop=None,  # Stop sequence (optional)
+            temperature=0.7,  # Controls randomness (0 = deterministic, 1 = creative)
+        )
+        return response.choices[0].text.strip()
+    except Exception as e:
+        print(f"OpenAI API error: {str(e)}")
+        return "Sorry, I encountered an error while processing your request."
+
 # Routes
 @app.route('/')
 def index():
@@ -68,6 +89,16 @@ def index():
 def dashboard():
     """Dashboard page route"""
     return render_template('dashboard.html', user=session.get('user'))
+
+@app.route('/chatbot', methods=['GET', 'POST'])
+@login_required
+def chatbot():
+    """Chatbot interaction route"""
+    if request.method == 'POST':
+        user_input = request.form['user_input']
+        response = ask_openai(user_input)
+        return jsonify({'response': response})
+    return render_template('chatbot.html', user=session.get('user'))
 
 @app.route('/signup', methods=['POST'])
 def signup():
