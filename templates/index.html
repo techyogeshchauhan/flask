@@ -4,11 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Bot - Login/Signup</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <!-- Google Sign-In -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         .google-icon {
@@ -19,9 +16,31 @@
             background-repeat: no-repeat;
             background-position: center;
         }
+        .flash-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            animation: slideIn 0.5s ease-out;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-500 to-purple-600 min-h-screen flex items-center justify-center p-4">
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="flash-message p-4 rounded-lg shadow-lg {% if category == 'danger' %}bg-red-500{% else %}bg-green-500{% endif %} text-white">
+                {{ message }}
+            </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
     <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl w-full max-w-md p-8">
         <div class="flex justify-center mb-8">
             <div class="bg-gray-100 p-1 rounded-lg inline-flex relative">
@@ -47,11 +66,20 @@
                     <p class="text-gray-600 text-sm mt-2">Get started with your AI assistant</p>
                 </div>
 
-                <div class="space-y-6">
-                    <button class="w-full flex items-center gap-3 bg-white border border-gray-200 p-3 rounded-lg hover:bg-gray-50 transition-colors duration-200 shadow-sm">
-                        <div class="google-icon"></div>
-                        <span class="text-gray-600">Continue with Google</span>
-                    </button>
+                <form action="{{ url_for('signup') }}" method="POST" class="space-y-6">
+                    <div id="g_id_onload"
+                         data-client_id="{{ CLIENT_ID }}"
+                         data-callback="handleGoogleSignIn"
+                         data-auto_prompt="false">
+                    </div>
+                    <div class="g_id_signin"
+                         data-type="standard"
+                         data-size="large"
+                         data-theme="outline"
+                         data-text="sign_in_with"
+                         data-shape="rectangular"
+                         data-logo_alignment="left">
+                    </div>
 
                     <div class="flex items-center gap-3">
                         <div class="flex-1 h-px bg-gray-200"></div>
@@ -62,22 +90,22 @@
                     <div class="space-y-4">
                         <div class="relative group">
                             <i class="fas fa-user absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-purple-500 transition-colors"></i>
-                            <input type="text" placeholder="Username" class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white" />
+                            <input type="text" name="username" required placeholder="Username" class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white" />
                         </div>
                         <div class="relative group">
                             <i class="fas fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-purple-500 transition-colors"></i>
-                            <input type="email" placeholder="Email" class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white" />
+                            <input type="email" name="email" required placeholder="Email" class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white" />
                         </div>
                         <div class="relative group">
                             <i class="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-purple-500 transition-colors"></i>
-                            <input type="password" placeholder="Password" class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white" />
+                            <input type="password" name="password" required placeholder="Password" class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white" />
                         </div>
                     </div>
 
-                    <button class="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg hover:opacity-90 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0">
+                    <button type="submit" class="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg hover:opacity-90 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0">
                         Create Account
                     </button>
-                </div>
+                </form>
             </div>
 
             <!-- Login Form -->
@@ -90,11 +118,20 @@
                     <p class="text-gray-600 text-sm mt-2">Login to continue chatting</p>
                 </div>
 
-                <div class="space-y-6">
-                    <button class="w-full flex items-center gap-3 bg-white border border-gray-200 p-3 rounded-lg hover:bg-gray-50 transition-colors duration-200 shadow-sm">
-                        <div class="google-icon"></div>
-                        <span class="text-gray-600">Continue with Google</span>
-                    </button>
+                <form action="{{ url_for('login') }}" method="POST" class="space-y-6">
+                    <div id="g_id_onload"
+                         data-client_id="{{ CLIENT_ID }}"
+                         data-callback="handleGoogleSignIn"
+                         data-auto_prompt="false">
+                    </div>
+                    <div class="g_id_signin"
+                         data-type="standard"
+                         data-size="large"
+                         data-theme="outline"
+                         data-text="sign_in_with"
+                         data-shape="rectangular"
+                         data-logo_alignment="left">
+                    </div>
 
                     <div class="flex items-center gap-3">
                         <div class="flex-1 h-px bg-gray-200"></div>
@@ -105,18 +142,18 @@
                     <div class="space-y-4">
                         <div class="relative group">
                             <i class="fas fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors"></i>
-                            <input type="email" placeholder="Email" class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white" />
+                            <input type="email" name="email" required placeholder="Email" class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white" />
                         </div>
                         <div class="relative group">
                             <i class="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors"></i>
-                            <input type="password" placeholder="Password" class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white" />
+                            <input type="password" name="password" required placeholder="Password" class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white" />
                         </div>
                     </div>
 
-                    <button class="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white py-3 rounded-lg hover:opacity-90 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0">
+                    <button type="submit" class="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white py-3 rounded-lg hover:opacity-90 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0">
                         Login
                     </button>
-                </div>
+                </form>
             </div>
         </div>
     </div>
@@ -148,9 +185,42 @@
             }
         }
 
+        // Google Sign-In callback
+        function handleGoogleSignIn(response) {
+            const credential = response.credential;
+            
+            fetch('/google_auth', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ token: credential })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    window.location.href = '/';
+                } else {
+                    console.error('Google authentication failed:', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+
         // Initialize the form to signup view
         document.addEventListener('DOMContentLoaded', () => {
             toggleView('signup');
+            
+            // Auto-hide flash messages after 5 seconds
+            const flashMessages = document.querySelectorAll('.flash-message');
+            flashMessages.forEach(message => {
+                setTimeout(() => {
+                    message.style.opacity = '0';
+                    setTimeout(() => message.remove(), 500);
+                }, 5000);
+            });
         });
     </script>
 </body>
