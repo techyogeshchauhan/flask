@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>University AI Assistant</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <a href="{{ url_for('settings') }}" class="flex items-center px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-lg">
+        <i class="fas fa-cog mr-2"></i>
+        Settings
+    </a>    
+</head>
+<body class="bg-white">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="w-64 bg-gray-900 p-4 flex flex-col">
+            <!-- Profile Section -->
+            <div class="flex items-center mb-6 text-white p-2 rounded-lg hover:bg-gray-800">
+                <div class="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white">
+                    {{ user.username[0]|upper }}
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm font-medium">{{ user.username }}</p>
+                    <p class="text-xs text-gray-400">{{ user.email }}</p>
+                </div>
+            </div>
+
+            <!-- New Chat Button -->
+            <button onclick="clearChat()" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-md p-3 flex items-center justify-center gap-2 text-sm mb-4">
+                <i class="fas fa-plus"></i>
+                New chat
+            </button>
+            <button onclick="clearChat()" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-md p-3 flex items-center justify-center gap-2 text-sm mb-4">
+                <i class="fas fa-trash"></i>
+                Clear Chat History
+            </button>
+
+            <!-- Chat History -->
+            <div class="flex-1 overflow-y-auto">
+                <div class="text-gray-400 text-xs font-medium mb-2 px-2">Chat History</div>
+                <div id="chat-history-list" class="space-y-2">
+                    {% for chat in chat_history %}
+                    <button onclick="loadChat('{{ chat.id }}')" class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-lg truncate">
+                        <i class="fas fa-message mr-2"></i>
+                        {{ chat.user_input[:50] }}
+                    </button>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Settings & Logout -->
+            <div class="border-t border-gray-700 pt-4 mt-4 space-y-2">
+                <a href="{{ url_for('settings') }}" class="flex items-center px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-lg">
+                    <i class="fas fa-cog mr-2"></i>
+                    Settings
+                </a>
+                <a href="{{ url_for('logout') }}" class="flex items-center px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-lg">
+                    <i class="fas fa-sign-out-alt mr-2"></i>
+                    Logout
+                </a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col bg-gray-50">
+            <!-- Top Bar -->
+            <div class="bg-white border-b border-gray-200 p-4">
+                <div class="max-w-3xl mx-auto flex items-center justify-between">
+                    <h1 class="text-xl font-semibold text-gray-700" id="chat-title">New Chat</h1>
+                    <div class="flex items-center gap-2">
+                        <button onclick="shareChat()" class="p-2 text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-share-alt"></i>
+                        </button>
+                        <button onclick="exportChat()" class="p-2 text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-download"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+           <!-- Chat Container -->
+<div id="chat-container" class="flex-1 overflow-y-auto p-8">
+    <!-- Debug: Print chat history -->
+    <pre>{{ chat_history }}</pre>
+
+    {% for chat in chat_history %}
+        <!-- User Message -->
+        <div class="max-w-3xl mx-auto mb-6 bg-white rounded-lg p-4">
+            <div class="flex items-center mb-2 text-sm font-semibold">
+                <i class="fas fa-user mr-2"></i>
+                User
+                <span class="ml-auto text-xs text-gray-500">{{ chat[3] }}</span>  <!-- created_at -->
+            </div>
+            <div class="text-gray-700">
+                {{ chat[1] }}  <!-- user_input -->
+            </div>
+        </div>
+
+        <!-- Assistant Message -->
+        <div class="max-w-3xl mx-auto mb-6 bg-gray-50 rounded-lg p-4">
+            <div class="flex items-center mb-2 text-sm font-semibold">
+                <i class="fas fa-robot mr-2"></i>
+                Assistant
+                <span class="ml-auto text-xs text-gray-500">{{ chat[3] }}</span>  <!-- created_at -->
+            </div>
+            <div class="text-gray-700">
+                {{ chat[2] }}  <!-- bot_response -->
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+            <!-- Typing Indicator -->
+            <div id="typing-indicator" class="hidden max-w-3xl mx-auto p-4 text-gray-500 text-center">
+                Assistant is typing...
+            </div>
+
+            <!-- Input Container -->
+            <div class="border-t border-gray-200 bg-white p-6">
+                <div class="max-w-3xl mx-auto relative">
+                    <textarea 
+                        id="user-input" 
+                        class="w-full rounded-lg border border-gray-200 p-3 pr-12 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
+                        placeholder="Message ChatGPT..."
+                        rows="1"
+                        onkeydown="handleKeyDown(event)"
+                    ></textarea>
+                    <button id="send-button" class="absolute right-3 bottom-3 text-emerald-600 disabled:text-gray-300 disabled:cursor-not-allowed" disabled>
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const inputField = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const chatContainer = document.getElementById('chat-container');
+        const typingIndicator = document.getElementById('typing-indicator');
+        let currentChatId = null;
+    
+        // Adjust textarea height dynamically
+        function adjustTextareaHeight() {
+            inputField.style.height = 'auto';
+            inputField.style.height = (inputField.scrollHeight) + 'px';
+        }
+    
+        inputField.addEventListener('input', function() {
+            adjustTextareaHeight();
+            sendButton.disabled = !this.value.trim();
+        });
+    
+        // Handle Enter key press
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                if (!sendButton.disabled) {
+                    sendMessage();
+                }
+            }
+        }
+    
+        // Add a new message to the chat container
+        function addMessage(role, content, timestamp) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `max-w-3xl mx-auto mb-6 ${role === 'user' ? 'bg-white' : 'bg-gray-50'} rounded-lg p-4`;
+            
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'flex items-center mb-2 text-sm font-semibold';
+            headerDiv.innerHTML = `
+                <i class="fas ${role === 'user' ? 'fa-user' : 'fa-robot'} mr-2"></i>
+                ${role === 'user' ? 'User' : 'Assistant'}
+                <span class="ml-auto text-xs text-gray-500">${timestamp || new Date().toLocaleTimeString()}</span>
+            `;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'text-gray-700';
+            contentDiv.textContent = content;
+            
+            messageDiv.appendChild(headerDiv);
+            messageDiv.appendChild(contentDiv);
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    
+        // Send user message to the backend
+        function sendMessage() {
+            const message = inputField.value.trim();
+            if (!message) return;
+    
+            addMessage('user', message);
+            inputField.value = '';
+            adjustTextareaHeight();
+            sendButton.disabled = true;
+    
+            typingIndicator.classList.remove('hidden');
+    
+            fetch('/get_response', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: message,
+                    chat_id: currentChatId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                typingIndicator.classList.add('hidden');
+                addMessage('assistant', data.response, data.timestamp);
+                if (data.chat_id) {
+                    currentChatId = data.chat_id;
+                    updateChatHistory(data.chat_title);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                typingIndicator.classList.add('hidden');
+                addMessage('assistant', 'Sorry, there was an error processing your request.');
+            });
+        }
+    
+        // Load a specific chat
+        function loadChat(chatId) {
+            fetch(`/load_chat/${chatId}`)
+                .then(response => response.json())
+                .then(data => {
+                    currentChatId = chatId;
+                    chatContainer.innerHTML = '';
+                    document.getElementById('chat-title').textContent = data.title;
+                    data.messages.forEach(msg => {
+                        addMessage(msg.role, msg.content, msg.timestamp);
+                    });
+                })
+                .catch(error => console.error('Error:', error));
+        }
+    
+        // Update chat history list
+        function updateChatHistory(title) {
+            const chatHistoryList = document.getElementById('chat-history-list');
+            const newChatButton = document.createElement('button');
+            newChatButton.className = 'w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-lg truncate';
+            newChatButton.innerHTML = `<i class="fas fa-message mr-2"></i>${title}`;
+            newChatButton.onclick = () => loadChat(currentChatId);
+            chatHistoryList.insertBefore(newChatButton, chatHistoryList.firstChild);
+        }
+    
+        // Clear chat history
+        function clearChat() {
+            fetch('/clear_history', {
+                method: 'POST',
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    currentChatId = null;
+                    chatContainer.innerHTML = '';
+                    document.getElementById('chat-title').textContent = 'New Chat';
+                    addMessage('assistant', 'How can I help you today?');
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    
+        // Share chat
+        function shareChat() {
+            if (currentChatId) {
+                // Implement sharing functionality
+                console.log('Share chat:', currentChatId);
+            }
+        }
+    
+        // Export chat
+        function exportChat() {
+            if (currentChatId) {
+                fetch(`/export_chat/${currentChatId}`)
+                    .then(response => response.blob())
+                    .then(blob => {
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'chat_export.txt';
+                        a.click();
+                    })
+                    .catch(error => console.error('Error:', error));
+            }
+        }
+    
+        // Load chat history when the page loads
+        document.addEventListener('DOMContentLoaded', function () {
+            fetch('/chatbot')
+                .then(response => response.json())
+                .then(data => {
+                    const chatContainer = document.getElementById('chat-container');
+                    chatContainer.innerHTML = ''; // Clear existing messages
+    
+                    data.chat_history.forEach(chat => {
+                        addMessage('user', chat.user_input, chat.created_at);
+                        addMessage('assistant', chat.bot_response, chat.created_at);
+                    });
+                })
+                .catch(error => console.error('Error loading chat history:', error));
+        });
+    
+        sendButton.addEventListener('click', sendMessage);
+    </script>
+</body>
+</html>

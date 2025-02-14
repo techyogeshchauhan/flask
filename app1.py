@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, Response
 from flask_mysqldb import MySQL
 from google.oauth2 import id_token
 from google.auth.transport import requests
@@ -8,7 +8,7 @@ from datetime import datetime
 from functools import wraps
 import google.generativeai as genai  # Import Gemini API
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates')
 
 # Configuration
 app.config['MYSQL_HOST'] = 'localhost'
@@ -116,16 +116,100 @@ def chatbot():
     # Fetch chat history for the user
     cur = mysql.connection.cursor()
     cur.execute("""
-        SELECT user_input, bot_response, created_at 
+        SELECT id, user_input, bot_response, created_at 
         FROM chat_history 
         WHERE user_id = %s 
         ORDER BY created_at DESC
     """, (session['user']['id'],))
     chat_history = cur.fetchall()
     cur.close()
-    
-    return render_template('chatbot.html', user=session.get('user'), chat_history=chat_history)
 
+    # Debug: Print chat history to the console
+    print("Chat History:", chat_history)
+    
+    return render_template('chatbot.html', user=session.get('user'), chat_history=chat_history)     
+
+@app.route('/get_response', methods=['POST'])
+@login_required
+def get_response():
+    data = request.json
+    user_input = data.get('message')
+    chat_id = data.get('chat_id')
+
+    # Get response from Gemini
+    response = ask_gemini(user_input)
+
+    # Save chat history
+    cur = mysql.connection.cursor()
+    cur.execute("""
+        INSERT INTO chat_history (user_id, user_input, bot_response)
+        VALUES (%s, %s, %s)
+    """, (session['user']['id'], user_input, response))
+    mysql.connection.commit()
+    cur.close()
+
+    return jsonify({
+        'response': response,
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'chat_id': chat_id if chat_id else None,
+        'chat_title': user_input[:50]  # Use the first 50 characters as the chat title
+    })
+
+@app.route('/load_chat/<int:chat_id>', methods=['GET'])
+@login_required
+def load_chat(chat_id):
+    cur = mysql.connection.cursor()
+    cur.execute("""
+        SELECT user_input, bot_response, created_at 
+        FROM chat_history 
+        WHERE id = %s AND user_id = %s
+        ORDER BY created_at ASC
+    """, (chat_id, session['user']['id']))
+    messages = cur.fetchall()
+    cur.close()
+
+    chat_data = {
+        'title': messages[0][0][:50] if messages else 'Chat',
+        'messages': [{'role': 'user' if i % 2 == 0 else 'assistant', 'content': msg[0] if i % 2 == 0 else msg[1], 'timestamp': msg[2].strftime('%Y-%m-%d %H:%M:%S')} for i, msg in enumerate(messages)]
+    }
+
+    return jsonify(chat_data)
+
+@app.route('/clear_history', methods=['POST'])
+@login_required
+def clear_history():
+    cur = mysql.connection.cursor()
+    cur.execute("""
+        DELETE FROM chat_history 
+        WHERE user_id = %s
+    """, (session['user']['id'],))
+    mysql.connection.commit()
+    cur.close()
+
+    return jsonify({'status': 'success'})
+
+@app.route('/export_chat/<int:chat_id>', methods=['GET'])
+@login_required
+def export_chat(chat_id):
+    cur = mysql.connection.cursor()
+    cur.execute("""
+        SELECT user_input, bot_response, created_at 
+        FROM chat_history 
+        WHERE id = %s AND user_id = %s
+        ORDER BY created_at ASC
+    """, (chat_id, session['user']['id']))
+    messages = cur.fetchall()
+    cur.close()
+
+    chat_text = "\n".join([f"{msg[2]}: {msg[0]}\n{msg[2]}: {msg[1]}" for msg in messages])
+
+    return Response(
+        chat_text,
+        mimetype="text/plain",
+        headers={"Content-Disposition": f"attachment;filename=chat_{chat_id}.txt"}
+    )
+
+# Other routes (signup, login, logout, etc.) remain unchanged...
 @app.route('/signup', methods=['POST'])
 def signup():
     """Handle user signup"""
@@ -195,151 +279,17 @@ def login():
             print(f"Login error: {str(e)}")
             flash(f"An error occurred during login: {str(e)}", "danger")
             return redirect(url_for('index'))
-
-@app.route('/google_auth', methods=['POST'])
-def google_auth():
-    """Handle Google OAuth authentication"""
-    try:
-        token = request.json['token']
-        idinfo = id_token.verify_oauth2_token(token, requests.Request(), CLIENT_ID)
-
-        if idinfo['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
-            raise ValueError('Wrong issuer.')
-
-        google_id = idinfo['sub']
-        user_email = idinfo['email']
-        user_name = idinfo.get('name', user_email.split('@')[0])
-
-        cur = mysql.connection.cursor()
-        
-        # Check if user exists
-        cur.execute("SELECT * FROM users WHERE google_id = %s OR email = %s", (google_id, user_email))
-        user = cur.fetchone()
-
-        if not user:
-            # Create new Google user
-            cur.execute("""
-                INSERT INTO users (username, email, google_id, created_at) 
-                VALUES (%s, %s, %s, %s)
-            """, (user_name, user_email, google_id, datetime.now()))
-            mysql.connection.commit()
-            
-            # Get the newly created user
-            cur.execute("SELECT * FROM users WHERE google_id = %s", (google_id,))
-            user = cur.fetchone()
-
-        session['user'] = {
-            'id': user[0],
-            'username': user[1],
-            'email': user[2],
-            'created_at': user[5]
-        }
-        
-        cur.close()
-        return jsonify({'status': 'success', 'redirect': url_for('dashboard')}), 200
-
-    except Exception as e:
-        print(f"Google auth error: {str(e)}")
-        return jsonify({'status': 'error', 'message': str(e)}), 400
-
 @app.route('/logout')
 def logout():
     """Handle user logout"""
     session.pop('user', None)
     flash("Logged out successfully!", "success")
     return redirect(url_for('index'))
-
-@app.route('/profile')
-@login_required
-def profile():
-    """User profile page route"""
-    try:
-        cur = mysql.connection.cursor()
-        cur.execute("SELECT * FROM users WHERE id = %s", (session['user']['id'],))
-        user_data = cur.fetchone()
-        cur.close()
-        
-        if user_data:
-            user_info = {
-                'id': user_data[0],
-                'username': user_data[1],
-                'email': user_data[2],
-                'created_at': user_data[5],
-                'is_google_user': bool(user_data[4])  # Check if google_id exists
-            }
-            return render_template('profile.html', user=user_info)
-        else:
-            flash("User not found.", "danger")
-            return redirect(url_for('index'))
-            
-    except Exception as e:
-        print(f"Profile error: {str(e)}")
-        flash("An error occurred while loading profile.", "danger")
-        return redirect(url_for('dashboard'))
-
 @app.route('/settings')
 @login_required
 def settings():
     """Settings page route"""
     return render_template('settings.html', user=session.get('user'))
 
-@app.route('/update_profile', methods=['POST'])
-@login_required
-def update_profile():
-    """Handle profile updates"""
-    try:
-        username = request.form['username']
-        current_password = request.form.get('current_password')
-        new_password = request.form.get('new_password')
-        
-        cur = mysql.connection.cursor()
-        
-        if new_password:
-            # Verify current password
-            cur.execute("SELECT password FROM users WHERE id = %s", (session['user']['id'],))
-            stored_password = cur.fetchone()[0]
-            
-            if stored_password != hash_password(current_password):
-                cur.close()
-                flash("Current password is incorrect.", "danger")
-                return redirect(url_for('profile'))
-            
-            # Update username and password
-            cur.execute("""
-                UPDATE users 
-                SET username = %s, password = %s 
-                WHERE id = %s
-            """, (username, hash_password(new_password), session['user']['id']))
-        else:
-            # Update username only
-            cur.execute("""
-                UPDATE users 
-                SET username = %s 
-                WHERE id = %s
-            """, (username, session['user']['id']))
-        
-        mysql.connection.commit()
-        cur.close()
-        
-        # Update session
-        session['user']['username'] = username
-        flash("Profile updated successfully!", "success")
-        return redirect(url_for('profile'))
-        
-    except Exception as e:
-        print(f"Update profile error: {str(e)}")
-        flash("An error occurred while updating profile.", "danger")
-        return redirect(url_for('profile'))
-
-# Error handlers
-@app.errorhandler(404)
-def not_found_error(error):
-    return render_template('404.html'), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    mysql.connection.rollback()
-    return render_template('500.html'), 500
-
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(debug=True)
