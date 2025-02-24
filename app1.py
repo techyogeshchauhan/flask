@@ -24,7 +24,7 @@ mysql = MySQL(app)
 CLIENT_ID = "1058099786136-rduhgd2e6rnln5op6romet21vcshjrb3.apps.googleusercontent.com"
 
 # Gemini API Configuration
-genai.configure(api_key='AIzaSyCpxJBVGRH2WWlxKEQ-kMC-vP9u5-Ckw_k')  # Replace with your Gemini API key
+genai.configure(api_key='AIzaSyDZgRlmVLPy1X3yvuAqBAeuU9Z08_9CBKU')  # Replace with your Gemini API key
 
 # Helper Functions
 def hash_password(password):
