@@ -1,4 +1,4 @@
-# University Chatbot - Dev Sanskriti Vishwavidyalaya
+# Chatbot - Dev Sanskriti Vishwavidyalaya
 
 ![Chatbot Icon](https://img.icons8.com/clouds/100/000000/chatbot.png)
 
